@@ -1,0 +1,112 @@
+def submodules = [
+        'localdev',
+        'aws-bootstrap',
+        'tf-devops',
+        'tf-dataproc',
+        'tf-datalabs'
+]
+
+task gitSubmodulesInitUpdate {
+    group "git"
+    description "After cloning the project, init and update submodules with specific branches if required."
+    doFirst {
+        exec {
+            commandLine 'bash', '-c', "git submodule init && git submodule update"
+            ignoreExitValue true
+        }
+    }
+
+    doLast {
+        submodules.each { submodule ->
+            if (!(submodule in ['NAME_OF_SUBMODULE'])) {
+                exec {
+                    workingDir "${submodule}"
+                    commandLine 'bash', '-c', "git checkout master"
+                    ignoreExitValue true
+                }
+            } else {
+                if (submodule == 'NAME_OF_SUBMODULE') {
+                    exec {
+                        workingDir "${submodule}"
+                        commandLine 'bash', '-c', "git checkout BRANCH_NAME"
+                        ignoreExitValue true
+                    }
+                }
+            }
+        }
+    }
+}
+
+task gitSubmodulesUpdate {
+    group "git"
+    description "update submodules"
+    doLast {
+        exec {
+            commandLine 'bash', '-c', "git submodule update --init --recursive"
+            ignoreExitValue true
+        }
+    }
+}
+
+task gitSubmodulesPull {
+    description 'Recursively pulls all submodules. This will fail on merge conflicts which you will have to resolve on your host individually.'
+    doLast {
+        exec {
+            commandLine 'bash', '-c', "git submodule foreach 'git pull'"
+            ignoreExitValue false
+        }
+    }
+    group "git"
+}
+
+task gitSubmodulesCommit {
+    description 'Recursively adds and commits all files in submodules with the same commit message. Use for mass refactoring like work.'
+    doLast {
+        def console = System.console()
+        if (!console) {
+            throw new GradleException('Run command with --no-daemon argument e.g. ./gradlew gitsubmodulescommit --no-daemon. A console is required for this task.')
+        }
+        def gitComment = project.hasProperty('gitComment') ? project.property('gitComment') : console.readLine('> Enter git commit message: ')
+
+        exec {
+            commandLine 'bash', '-c', "git submodule foreach 'git add .'"
+            ignoreExitValue true
+        }
+        exec {
+            commandLine 'bash', '-c', "git submodule foreach \"git commit -m '${gitComment}' || :\""
+            ignoreExitValue true
+        }
+    }
+    group "git"
+}
+
+task gitSubmodulesPush {
+    description 'Recursively push all submodules with the same commit message with the on-demand option set.'
+    doLast {
+        submodules.each { submodule ->
+            exec {
+                workingDir "${submodule}"
+                commandLine 'bash', '-c', "git push"
+                ignoreExitValue false
+            }
+        }
+    }
+    group "git"
+}
+
+task gitSubmodulesMergeDevelopToMaster {
+    description 'Recursively push all submodules with the same commit message with the on-demand option set.'
+    doLast {
+        submodules.each { submodule ->
+            if (!(submodule in ['localdev'])) {
+                exec {
+                    workingDir "${submodule}"
+                    commandLine 'bash', '-c', "git checkout master && git merge develop"
+                    ignoreExitValue true
+                }
+            }
+        }
+    }
+    group "git"
+}
+
